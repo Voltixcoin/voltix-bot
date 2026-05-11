@@ -528,14 +528,15 @@ def reset_cmd(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callbacks(call):
+
     if call.data == "verify_join":
 
-    if is_channel_member(call.from_user.id):
+        if is_channel_member(call.from_user.id):
 
-        bot.answer_callback_query(
-            call.id,
-            "✅ Membership verified!"
-        )
+            bot.answer_callback_query(
+                call.id,
+                "✅ Membership verified!"
+            )
 
         bot.send_message(
             call.message.chat.id,
