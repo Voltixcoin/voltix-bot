@@ -363,7 +363,7 @@ text = f"""
 ⚠️ Important: An invite is valid only if the invited person stays subscribed until the campaign ends.
 """
 
-    bot.send_message(message.chat.id, text, reply_markup=user_keyboard(invite_link))
+bot.send_message(message.chat.id, text, reply_markup=user_keyboard(invite_link))
 
 
 @bot.message_handler(commands=["help"])
