@@ -65,9 +65,9 @@ def init_db():
     )
     """)
 
-    cur.execute("INSERT OR IGNORE INTO settings VALUES ('campaign_active', '0')")
-    cur.execute("INSERT OR IGNORE INTO settings VALUES ('campaign_start', '')")
-    cur.execute("INSERT OR IGNORE INTO settings VALUES ('campaign_end', '')")
+    cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('campaign_active', '0')")
+    cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('campaign_start', '')")
+    cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('campaign_end', '')")
 
     con.commit()
     con.close()
@@ -104,7 +104,6 @@ def campaign_active():
 def is_channel_member(user_id):
     try:
         member = bot.get_chat_member(CHANNEL_USERNAME, user_id)
-        print("CHANNEL CHECK:", user_id, member.status)
         return member.status in ["member", "administrator", "creator"]
     except Exception as e:
         print("CHANNEL CHECK ERROR:", e)
@@ -115,6 +114,7 @@ def parse_inviter(message):
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
         return None
+
     try:
         inviter_id = int(parts[1])
         if inviter_id == message.from_user.id:
@@ -226,6 +226,13 @@ def reset_campaign_data():
     set_setting("campaign_end", "")
 
 
+def force_join_keyboard():
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("📢 Join Channel", url=CHANNEL_LINK))
+    keyboard.add(types.InlineKeyboardButton("✅ Verify", callback_data="verify_join"))
+    return keyboard
+
+
 def user_keyboard(invite_link):
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton("📢 Join Channel", url=CHANNEL_LINK))
@@ -291,55 +298,22 @@ def start(message):
     inviter_id = parse_inviter(message)
     save_user(message, inviter_id)
 
+    if not is_channel_member(message.from_user.id):
+        bot.send_message(
+            message.chat.id,
+            "⚠️ You must join our channel first before using the bot.",
+            reply_markup=force_join_keyboard(),
+        )
+        return
+
     invite_link = f"https://t.me/{BOT_USERNAME}?start={message.from_user.id}"
     invites = raw_invites(message.from_user.id)
     remaining = max(0, MIN_VALID_INVITES - invites)
 
-    if not is_channel_member(message.from_user.id):
+    join_status = "✅ Joined"
+    status = "Active" if campaign_active() else "Not active yet"
 
-        keyboard = types.InlineKeyboardMarkup()
-
-        keyboard.add(
-            types.InlineKeyboardButton(
-                "📢 Join Channel",
-                url=CHANNEL_LINK
-            )
-        )
-
-        keyboard.add(
-            types.InlineKeyboardButton(
-                "✅ Verify",
-                callback_data="verify_join"
-            )
-        )
-
-        bot.send_message(
-            message.chat.id,
-            "⚠️ You must join our channel first before using the bot.",
-            reply_markup=keyboard
-        )
-
-        return
-
-    keyboard.add(
-        types.InlineKeyboardButton(
-            "✅ Verify",
-            callback_data="verify_join"
-        )
-    )
-
-    bot.send_message(
-        message.chat.id,
-        "⚠️ You must join our channel first before using the bot.",
-        reply_markup=keyboard
-    )
-
-    return
-
-join_status = "✅ Joined"
-status = "Active" if campaign_active() else "Not active yet"
-
-text = f"""
+    text = f"""
 🎉 <b>Welcome to VoltIX VTX Referral Campaign</b>
 
 📢 Channel: {CHANNEL_USERNAME}
@@ -363,7 +337,11 @@ text = f"""
 ⚠️ Important: An invite is valid only if the invited person stays subscribed until the campaign ends.
 """
 
-bot.send_message(message.chat.id, text, reply_markup=user_keyboard(invite_link))
+    bot.send_message(
+        message.chat.id,
+        text,
+        reply_markup=user_keyboard(invite_link),
+    )
 
 
 @bot.message_handler(commands=["help"])
@@ -543,30 +521,18 @@ def reset_cmd(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callbacks(call):
-
     if call.data == "verify_join":
-
         if is_channel_member(call.from_user.id):
-
+            bot.answer_callback_query(call.id, "✅ Membership verified!")
+            bot.send_message(call.message.chat.id, "🎉 Access granted.\n\nSend /start again.")
+        else:
             bot.answer_callback_query(
                 call.id,
-                "✅ Membership verified!"
+                "❌ You still need to join the channel.",
+                show_alert=True,
             )
+        return
 
-        bot.send_message(
-            call.message.chat.id,
-            "🎉 Access granted.\n\nSend /start again."
-        )
-
-    else:
-
-        bot.answer_callback_query(
-            call.id,
-            "❌ You still need to join the channel.",
-            show_alert=True
-        )
-
-    return
     if not is_admin(call.from_user.id):
         bot.answer_callback_query(call.id, "Not allowed", show_alert=True)
         return
@@ -614,8 +580,9 @@ def run_bot():
     bot.infinity_polling(
         skip_pending=True,
         timeout=30,
-        long_polling_timeout=30
+        long_polling_timeout=30,
     )
+
 
 if __name__ == "__main__":
     if BOT_TOKEN == "PUT_YOUR_BOT_TOKEN_HERE":
