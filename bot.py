@@ -337,9 +337,9 @@ def start(message):
     return
 
 join_status = "✅ Joined"
-    status = "Active" if campaign_active() else "Not active yet"
+status = "Active" if campaign_active() else "Not active yet"
 
-    text = f"""
+text = f"""
 🎉 <b>Welcome to VoltIX VTX Referral Campaign</b>
 
 📢 Channel: {CHANNEL_USERNAME}
