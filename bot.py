@@ -543,10 +543,7 @@ def run_flask():
     app.run(host="0.0.0.0", port=port)
 
 
-def run_bot():
-    bot.remove_webhook()
-    bot.infinity_polling(timeout=30, long_polling_timeout=30)
-
+fix polling
 
 if __name__ == "__main__":
     if BOT_TOKEN == "PUT_YOUR_BOT_TOKEN_HERE":
