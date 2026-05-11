@@ -295,8 +295,33 @@ def start(message):
     invites = raw_invites(message.from_user.id)
     remaining = max(0, MIN_VALID_INVITES - invites)
 
-    joined = is_channel_member(message.from_user.id)
-    join_status = "✅ Joined" if joined else "❌ Not joined yet"
+    if not is_channel_member(message.from_user.id):
+
+    keyboard = types.InlineKeyboardMarkup()
+
+    keyboard.add(
+        types.InlineKeyboardButton(
+            "📢 Join Channel",
+            url=CHANNEL_LINK
+        )
+    )
+
+    keyboard.add(
+        types.InlineKeyboardButton(
+            "✅ Verify",
+            callback_data="verify_join"
+        )
+    )
+
+    bot.send_message(
+        message.chat.id,
+        "⚠️ You must join our channel first before using the bot.",
+        reply_markup=keyboard
+    )
+
+    return
+
+join_status = "✅ Joined"
     status = "Active" if campaign_active() else "Not active yet"
 
     text = f"""
@@ -503,6 +528,29 @@ def reset_cmd(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callbacks(call):
+    if call.data == "verify_join":
+
+    if is_channel_member(call.from_user.id):
+
+        bot.answer_callback_query(
+            call.id,
+            "✅ Membership verified!"
+        )
+
+        bot.send_message(
+            call.message.chat.id,
+            "🎉 Access granted.\n\nSend /start again."
+        )
+
+    else:
+
+        bot.answer_callback_query(
+            call.id,
+            "❌ You still need to join the channel.",
+            show_alert=True
+        )
+
+    return
     if not is_admin(call.from_user.id):
         bot.answer_callback_query(call.id, "Not allowed", show_alert=True)
         return
