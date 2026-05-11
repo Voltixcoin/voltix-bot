@@ -8,15 +8,11 @@ from flask import Flask
 import telebot
 from telebot import types
 
-# =========================
-# CONFIG
-# =========================
-
 BOT_TOKEN = os.getenv("BOT_TOKEN", "PUT_YOUR_BOT_TOKEN_HERE")
 
 ADMIN_IDS = {6828876093, 7434864137}
 
-CHANNEL_USERNAME = "VOLTIXVTXCoin"
+CHANNEL_USERNAME = "@voltIXVTX"
 CHANNEL_LINK = "https://t.me/voltIXVTX"
 BOT_USERNAME = "VoltIXVTX_bot"
 
@@ -33,9 +29,6 @@ DB_PATH = "voltix.db"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
-# =========================
-# DATABASE
-# =========================
 
 def db():
     return sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -72,9 +65,9 @@ def init_db():
     )
     """)
 
-    cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('campaign_active', '0')")
-    cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('campaign_start', '')")
-    cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('campaign_end', '')")
+    cur.execute("INSERT OR IGNORE INTO settings VALUES ('campaign_active', '0')")
+    cur.execute("INSERT OR IGNORE INTO settings VALUES ('campaign_start', '')")
+    cur.execute("INSERT OR IGNORE INTO settings VALUES ('campaign_end', '')")
 
     con.commit()
     con.close()
@@ -100,6 +93,37 @@ def set_setting(key, value):
     con.close()
 
 
+def is_admin(user_id):
+    return user_id in ADMIN_IDS
+
+
+def campaign_active():
+    return get_setting("campaign_active", "0") == "1"
+
+
+def is_channel_member(user_id):
+    try:
+        member = bot.get_chat_member(CHANNEL_USERNAME, user_id)
+        print("CHANNEL CHECK:", user_id, member.status)
+        return member.status in ["member", "administrator", "creator"]
+    except Exception as e:
+        print("CHANNEL CHECK ERROR:", e)
+        return False
+
+
+def parse_inviter(message):
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        return None
+    try:
+        inviter_id = int(parts[1])
+        if inviter_id == message.from_user.id:
+            return None
+        return inviter_id
+    except Exception:
+        return None
+
+
 def save_user(message, inviter_id=None):
     user = message.from_user
     now = datetime.now(timezone.utc).isoformat()
@@ -107,7 +131,10 @@ def save_user(message, inviter_id=None):
     con = db()
     cur = con.cursor()
 
-    exists = cur.execute("SELECT user_id FROM users WHERE user_id=?", (user.id,)).fetchone()
+    exists = cur.execute(
+        "SELECT user_id FROM users WHERE user_id=?",
+        (user.id,),
+    ).fetchone()
 
     if exists:
         cur.execute(
@@ -124,7 +151,11 @@ def save_user(message, inviter_id=None):
     )
 
     if inviter_id and inviter_id != user.id:
-        inviter_exists = cur.execute("SELECT user_id FROM users WHERE user_id=?", (inviter_id,)).fetchone()
+        inviter_exists = cur.execute(
+            "SELECT user_id FROM users WHERE user_id=?",
+            (inviter_id,),
+        ).fetchone()
+
         if inviter_exists:
             cur.execute(
                 "INSERT OR IGNORE INTO referrals (inviter_id, invited_id, created_at) VALUES (?, ?, ?)",
@@ -138,7 +169,10 @@ def save_user(message, inviter_id=None):
 def raw_invites(user_id):
     con = db()
     cur = con.cursor()
-    count = cur.execute("SELECT COUNT(*) FROM referrals WHERE inviter_id=?", (user_id,)).fetchone()[0]
+    count = cur.execute(
+        "SELECT COUNT(*) FROM referrals WHERE inviter_id=?",
+        (user_id,),
+    ).fetchone()[0]
     con.close()
     return count
 
@@ -192,44 +226,15 @@ def reset_campaign_data():
     set_setting("campaign_end", "")
 
 
-# =========================
-# HELPERS
-# =========================
-
-def is_admin(user_id):
-    return user_id in ADMIN_IDS
-
-
-def campaign_active():
-    return get_setting("campaign_active", "0") == "1"
-
-
-def parse_inviter(message):
-    parts = message.text.split(maxsplit=1)
-    if len(parts) < 2:
-        return None
-
-    try:
-        inviter_id = int(parts[1])
-        if inviter_id == message.from_user.id:
-            return None
-        return inviter_id
-    except Exception:
-        return None
-
-
-def is_channel_member(user_id):
-    try:
-        member = bot.get_chat_member(CHANNEL_USERNAME, user_id)
-        return member.status in ["member", "administrator", "creator"]
-    except Exception:
-        return False
-
-
 def user_keyboard(invite_link):
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton("📢 Join Channel", url=CHANNEL_LINK))
-    keyboard.add(types.InlineKeyboardButton("🚀 Share Invite Link", switch_inline_query=f"Join VoltIX VTX and win rewards: {invite_link}"))
+    keyboard.add(
+        types.InlineKeyboardButton(
+            "🚀 Share Invite Link",
+            switch_inline_query=f"Join VoltIX VTX and win rewards: {invite_link}",
+        )
+    )
     return keyboard
 
 
@@ -281,10 +286,6 @@ def build_winners_text():
     return text
 
 
-# =========================
-# USER COMMANDS
-# =========================
-
 @bot.message_handler(commands=["start"])
 def start(message):
     inviter_id = parse_inviter(message)
@@ -334,12 +335,6 @@ def help_cmd(message):
 /myinvites - Show your invite stats
 /top - Show live leaderboard
 /help - Show this help message
-
-<b>Rules</b>
-- Invite users with your personal link.
-- The invited user must join the channel.
-- The invited user must stay subscribed until the campaign ends.
-- Minimum valid invites required: 25.
 """)
 
 
@@ -353,8 +348,6 @@ def my_invites(message):
 
 Recorded invites: <b>{invites}</b>
 Remaining to qualify: <b>{remaining}</b>
-
-Final valid invites are checked at campaign end based on who is still subscribed.
 """)
 
 
@@ -372,13 +365,8 @@ def top_cmd(message):
         name = f"@{user['username']}" if user.get("username") else user.get("first_name") or str(user["user_id"])
         text += f"{index}. {name} — {user['valid_invites']} valid invites\n"
 
-    text += "\n✅ Only users currently subscribed to the channel are counted."
     bot.send_message(message.chat.id, text)
 
-
-# =========================
-# ADMIN COMMANDS
-# =========================
 
 @bot.message_handler(commands=["admin"])
 def admin_cmd(message):
@@ -398,14 +386,6 @@ Admin ID: {message.from_user.id}
 Campaign status: <b>{status}</b>
 Users: <b>{total_users()}</b>
 
-Minimum valid invites: <b>{MIN_VALID_INVITES}</b>
-Duration: <b>{CAMPAIGN_DAYS} days</b>
-
-Rewards:
-1st: {PRIZES[1]}
-2nd: {PRIZES[2]}
-3rd: {PRIZES[3]}
-
 Admin commands:
 /start_campaign
 /end_campaign
@@ -422,6 +402,7 @@ Admin commands:
 @bot.message_handler(commands=["start_campaign"])
 def start_campaign(message):
     if not is_admin(message.from_user.id):
+        bot.send_message(message.chat.id, "You are not allowed to use this command.")
         return
 
     now = datetime.now(timezone.utc)
@@ -549,11 +530,8 @@ def callbacks(call):
     bot.answer_callback_query(call.id)
 
 
-# =========================
-# FLASK HEALTH SERVER FOR RENDER
-# =========================
-
 app = Flask(__name__)
+
 
 @app.route("/")
 def home():
@@ -575,6 +553,5 @@ if __name__ == "__main__":
         raise RuntimeError("BOT_TOKEN is missing. Add BOT_TOKEN in Render Environment Variables.")
 
     init_db()
-
     threading.Thread(target=run_flask, daemon=True).start()
     run_bot()
