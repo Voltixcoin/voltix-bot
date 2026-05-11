@@ -531,7 +531,6 @@ def callbacks(call):
                 "❌ You still need to join the channel.",
                 show_alert=True,
             )
-        return
 
     if not is_admin(call.from_user.id):
         bot.answer_callback_query(call.id, "Not allowed", show_alert=True)
