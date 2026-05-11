@@ -297,14 +297,29 @@ def start(message):
 
     if not is_channel_member(message.from_user.id):
 
-    keyboard = types.InlineKeyboardMarkup()
+        keyboard = types.InlineKeyboardMarkup()
 
-    keyboard.add(
-        types.InlineKeyboardButton(
-            "📢 Join Channel",
-            url=CHANNEL_LINK
+        keyboard.add(
+            types.InlineKeyboardButton(
+                "📢 Join Channel",
+                url=CHANNEL_LINK
+            )
         )
-    )
+
+        keyboard.add(
+            types.InlineKeyboardButton(
+                "✅ Verify",
+                callback_data="verify_join"
+            )
+        )
+
+        bot.send_message(
+            message.chat.id,
+            "⚠️ You must join our channel first before using the bot.",
+            reply_markup=keyboard
+        )
+
+        return
 
     keyboard.add(
         types.InlineKeyboardButton(
