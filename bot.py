@@ -25,7 +25,7 @@ PRIZES = {
     3: "$3",
 }
 
-DB_PATH = "voltix.db"
+DB_PATH = "/var/data/voltix.db"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
